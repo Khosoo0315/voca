@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "Voca AI",
+    "slug": "voca",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": false,
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#0b0d12"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "mn.voca.app",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Voca uses the microphone so you can speak your commands."
+      }
+    },
+    "android": {
+      "package": "mn.voca.app",
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "plugins": [
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Voca uses the microphone so you can speak your commands."
+        }
+      ]
+    ],
+    "extra": {
+      "API_BASE": "https://voca.example.com"
+    }
+  }
+}

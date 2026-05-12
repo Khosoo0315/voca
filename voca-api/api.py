@@ -19,10 +19,17 @@ import smtplib
 
 app = FastAPI(title="Voca AI API", version="2.1.0")
 
+_cors_origins_env = os.getenv("CORS_ORIGINS", "*").strip()
+_cors_origins = (
+    ["*"]
+    if _cors_origins_env in ("", "*")
+    else [o.strip() for o in _cors_origins_env.split(",") if o.strip()]
+)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_cors_origins,
+    allow_credentials=_cors_origins != ["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -36,6 +43,7 @@ GMAIL_USER = os.getenv("GMAIL_USER", "")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD", "")
 
 CHIMEGE_BASE = "https://api.chimege.com/v1.2"
+OPENAI_BASE = os.getenv("OPENAI_BASE", "https://api.openai.com/v1")
 
 def sanitize_tts_text(text: str) -> str:
     t = str(text or "")
@@ -221,18 +229,32 @@ async def text_to_speech(req: TTSReq):
 
         print(f"TTS final text length={len(text)}, normalize={req.normalize}", flush=True)
 
-        if False and req.normalize and CHIMEGE_NORM_TOKEN:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                norm_resp = await client.post(
-                    f"{CHIMEGE_BASE}/normalize-text",
-                    content=text.encode("utf-8"),
-                    headers={
-                        "Token": CHIMEGE_NORM_TOKEN,
-                        "Content-Type": "text/plain; charset=utf-8",
-                    },
-                )
-            if norm_resp.status_code == 200:
-                text = sanitize_tts_text(norm_resp.text.strip())
+        if req.normalize and CHIMEGE_NORM_TOKEN:
+            try:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    norm_resp = await client.post(
+                        f"{CHIMEGE_BASE}/normalize-text",
+                        content=text.encode("utf-8"),
+                        headers={
+                            "Token": CHIMEGE_NORM_TOKEN,
+                            "Content-Type": "text/plain; charset=utf-8",
+                        },
+                    )
+                if norm_resp.status_code == 200:
+                    normalized = sanitize_tts_text(norm_resp.text.strip())
+                    if normalized:
+                        text = normalized
+                else:
+                    print(
+                        f"NORMALIZE skipped status={norm_resp.status_code} body={norm_resp.text[:200]}",
+                        flush=True,
+                    )
+            except Exception as norm_exc:
+                print(f"NORMALIZE error (ignored): {norm_exc}", flush=True)
+
+        # Re-apply hard limit if normalize expanded the string.
+        if len(text) > 250:
+            text = text[:250].rsplit(" ", 1)[0] + "..."
 
         async with httpx.AsyncClient(timeout=60.0) as client:
             tts_resp = await client.post(
